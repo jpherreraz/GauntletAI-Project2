@@ -1,1 +1,111 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+.next/
+out/
+
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+packages/*/dist/
+packages/*/.env
+packages/*/.env.*
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Build artifacts
+*.tsbuildinfo
+.rollup.cache/
+stats.html
+
+# AWS Amplify
+amplify/
+.amplify/
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+team-provider-info.json
+
+# Supabase
+.supabase/
+
+# Upload directory
+uploads/
+
+# Cache
+.cache/
+.eslintcache
+.stylelintcache
+.parcel-cache/
+
+# Misc
+*.pem
+.env*.local
+*.bak
+*.orig
+*.old
+.vercel
+.netlify
+
+#amplify-do-not-edit-begin
+amplify/\#current-cloud-backend
+amplify/.config/local-*
+amplify/logs
+amplify/mock-data
+amplify/mock-api-resources
+amplify/backend/amplify-meta.json
+amplify/backend/.temp
+build/
+dist/
+node_modules/
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+amplifyconfiguration.dart
+amplify-build-config.json
+amplify-gradle-config.json
+amplifytools.xcconfig
+.secret-*
+**.sample
+#amplify-do-not-edit-end
