@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -51,7 +51,7 @@ import {
 } from '../../hooks/useTickets';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '@crm/shared/constants';
-import type { TicketUpdate, TicketAttachment } from '@crm/shared/types/ticket';
+import type { Ticket, TicketAttachment, TicketUpdate } from '@crm/shared/types/ticket';
 import { supabase } from '@crm/shared/utils/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -111,6 +111,7 @@ export const TicketDetail: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<TicketAttachment | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ticket, isLoading: isLoadingTicket } = useTicket(id!);
   const { data: commentsData } = useTicketComments(id!);
@@ -482,7 +483,7 @@ export const TicketDetail: React.FC = () => {
                   </Box>
                 )}
               </Box>
-              {ticket.attachments?.map((attachment) => (
+              {ticket.attachments?.map((attachment: TicketAttachment) => (
                 <Tooltip 
                   key={attachment.id}
                   title={`${attachment.fileName} (${formatFileSize(attachment.fileSize)})`}

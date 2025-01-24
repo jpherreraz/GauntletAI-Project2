@@ -77,7 +77,8 @@ export const ticketCreateSchema = ticketSchema
     assigneeId: true,
   })
   .extend({
-    attachments: z.array(z.string().url()).optional(),
+    customerId: z.string().uuid(),
+    dueDate: z.string().datetime().nullable(),
   });
 
 export type TicketCreate = z.infer<typeof ticketCreateSchema>;

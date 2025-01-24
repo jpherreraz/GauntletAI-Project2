@@ -10,6 +10,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useAuth } from './contexts/AuthContext';
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -18,8 +19,12 @@ const Users = React.lazy(() => import('./pages/Users'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Profile = React.lazy(() => import('./pages/Profile'));
+const FAQ = React.lazy(() => import('./pages/FAQ'));
 
 export const App: React.FC = () => {
+  const { user } = useAuth();
+  const isCustomer = user?.user_metadata?.role === UserRole.CUSTOMER;
+
   return (
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
@@ -29,11 +34,25 @@ export const App: React.FC = () => {
           <Route path={ROUTES.LOGIN} element={<LoginForm />} />
           <Route path={ROUTES.REGISTER} element={<RegisterForm />} />
 
+          {/* FAQ route - default for customers */}
+          <Route
+            path={ROUTES.FAQ}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <React.Suspense fallback={<div>Loading...</div>}>
+                    <FAQ />
+                  </React.Suspense>
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected routes */}
           <Route
             path={ROUTES.DASHBOARD}
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.WORKER]}>
                 <AppLayout>
                   <React.Suspense fallback={<div>Loading...</div>}>
                     <Dashboard />
@@ -108,16 +127,26 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Redirect root to dashboard if authenticated, otherwise to login */}
+          {/* Redirect root based on user role */}
           <Route
             path="/"
-            element={<Navigate to={ROUTES.DASHBOARD} replace />}
+            element={
+              <Navigate 
+                to={isCustomer ? ROUTES.FAQ : ROUTES.DASHBOARD} 
+                replace 
+              />
+            }
           />
 
           {/* Catch all route */}
           <Route
             path="*"
-            element={<Navigate to={ROUTES.DASHBOARD} replace />}
+            element={
+              <Navigate 
+                to={isCustomer ? ROUTES.FAQ : ROUTES.DASHBOARD} 
+                replace 
+              />
+            }
           />
         </Routes>
       </ThemeProvider>

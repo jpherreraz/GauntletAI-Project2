@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -19,13 +19,13 @@ import { useCreateTicket } from '../../hooks/useTickets';
 import { ROUTES } from '@crm/shared/constants';
 import { TicketPriority, TicketStatus } from '@crm/shared/types/ticket';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '@crm/shared/utils/api-client';
 
 interface FormValues {
   title: string;
   description: string;
   priority: typeof TicketPriority[keyof typeof TicketPriority];
   category: string;
-  dueDate: Date | null;
 }
 
 const validationSchema = yup.object({
@@ -33,13 +33,13 @@ const validationSchema = yup.object({
   description: yup.string().required('Description is required'),
   priority: yup.string().oneOf(Object.values(TicketPriority)).required('Priority is required'),
   category: yup.string().required('Category is required'),
-  dueDate: yup.date().nullable(),
 });
 
 const CreateTicket: React.FC = () => {
   const navigate = useNavigate();
   const createTicket = useCreateTicket();
   const { user } = useAuth();
+  const [error, setError] = useState<string | null>(null);
 
   const formik = useFormik<FormValues>({
     initialValues: {
@@ -47,25 +47,72 @@ const CreateTicket: React.FC = () => {
       description: '',
       priority: TicketPriority.LOW,
       category: '',
-      dueDate: null,
     },
     validationSchema,
     onSubmit: async (values) => {
       try {
-        if (!user?.id) return;
+        if (!user?.id) {
+          setError('User not authenticated');
+          return;
+        }
+
+        // Log user ID
+        console.log('Current user ID:', user.id);
         
-        await createTicket.mutateAsync({
+        // Check if profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+        console.log('Profile check result:', { profile, profileError });
+
+        if (!profile) {
+          console.log('Creating profile for user...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{ 
+              id: user.id, 
+              firstName: '', 
+              lastName: '', 
+              role: 'customer' 
+            }])
+            .select()
+            .single();
+          
+          console.log('Profile creation result:', { newProfile, createError });
+          
+          if (createError) {
+            console.error('Profile creation error:', createError);
+            setError('Failed to create user profile');
+            return;
+          }
+        }
+        
+        const ticketData = {
           ...values,
           status: TicketStatus.OPEN,
           customerId: user.id,
-          dueDate: values.dueDate?.toISOString() || null,
+          dueDate: null,
           tags: [],
-          attachments: [],
-        });
+        };
+        
+        console.log('Creating ticket with data:', ticketData);
+        const result = await createTicket.mutateAsync(ticketData);
+        console.log('Ticket created:', result);
 
         navigate(ROUTES.TICKETS);
-      } catch (error) {
-        console.error('Failed to create ticket:', error);
+      } catch (err) {
+        console.error('Failed to create ticket:', err);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else if (typeof err === 'object' && err !== null) {
+          console.error('Detailed error:', JSON.stringify(err, null, 2));
+          setError('Failed to create ticket. Check console for details.');
+        } else {
+          setError('Failed to create ticket');
+        }
       }
     },
   });
@@ -78,6 +125,12 @@ const CreateTicket: React.FC = () => {
       </Box>
 
       <Paper sx={{ p: 3 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        
         <form onSubmit={formik.handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
@@ -142,27 +195,6 @@ const CreateTicket: React.FC = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.category && Boolean(formik.errors.category)}
                 helperText={formik.touched.category && formik.errors.category}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                id="dueDate"
-                name="dueDate"
-                label="Due Date"
-                type="datetime-local"
-                value={formik.values.dueDate ? new Date(formik.values.dueDate).toISOString().slice(0, 16) : ''}
-                onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : null;
-                  formik.setFieldValue('dueDate', date);
-                }}
-                onBlur={formik.handleBlur}
-                error={formik.touched.dueDate && Boolean(formik.errors.dueDate)}
-                helperText={formik.touched.dueDate && formik.errors.dueDate}
-                InputLabelProps={{
-                  shrink: true,
-                }}
               />
             </Grid>
 

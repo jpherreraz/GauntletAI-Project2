@@ -31,6 +31,7 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   DASHBOARD: '/dashboard',
+  FAQ: '/faq',
   TICKETS: '/tickets',
   TICKET_DETAILS: (id: string) => `/tickets/${id}`,
   USERS: '/users',

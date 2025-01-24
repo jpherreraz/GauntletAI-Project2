@@ -31,6 +31,8 @@ import { useTickets, useDeleteTicket } from '../../hooks/useTickets';
 import { ROUTES } from '@crm/shared/constants';
 import type { TicketListParams } from '@crm/shared/types/api';
 import { TicketStatus, TicketPriority } from '@crm/shared/types/ticket';
+import { useAuth } from '../../contexts/AuthContext';
+import { UserRole } from '@crm/shared/types/user';
 
 const statusColors = {
   open: 'info',
@@ -47,11 +49,52 @@ const priorityColors = {
   urgent: 'error',
 } as const;
 
-const TicketList: React.FC = () => {
+interface TicketListProps {
+  filter?: 'unassigned' | 'unsolved' | 'recent' | 'pending' | 'solved' | 'suspended' | 'deleted';
+}
+
+const TicketList: React.FC<TicketListProps> = ({ filter }) => {
   const navigate = useNavigate();
-  const [params, setParams] = useState<TicketListParams>({
-    page: 1,
-    perPage: 10,
+  const { user } = useAuth();
+  const isCustomer = user?.user_metadata?.role === UserRole.CUSTOMER;
+  const [params, setParams] = useState<TicketListParams>(() => {
+    const initialParams: TicketListParams = {
+      page: 1,
+      perPage: 10,
+    };
+
+    if (filter === 'unassigned') {
+      initialParams.assigneeId = null;
+    }
+
+    if (filter === 'unsolved') {
+      initialParams.status = 'open';
+      initialParams.sortBy = 'updatedAt';
+      initialParams.sortOrder = 'desc';
+    }
+
+    if (filter === 'recent') {
+      initialParams.sortBy = 'updatedAt';
+      initialParams.sortOrder = 'desc';
+    }
+
+    if (filter === 'pending') {
+      initialParams.status = 'pending';
+    }
+
+    if (filter === 'solved') {
+      initialParams.status = 'resolved';
+    }
+
+    if (filter === 'suspended') {
+      initialParams.status = 'closed';
+    }
+
+    if (filter === 'deleted') {
+      initialParams.deleted = true;
+    }
+
+    return initialParams;
   });
 
   const { data, isLoading } = useTickets(params);
@@ -116,64 +159,68 @@ const TicketList: React.FC = () => {
         }}
       >
         <Typography variant="h4">Tickets</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate(ROUTES.TICKETS + '/new')}
+        {isCustomer && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate(ROUTES.TICKETS + '/new')}
+          >
+            New Ticket
+          </Button>
+        )}
+      </Box>
+
+      {!isCustomer && (
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 2,
+            mb: 3,
+          }}
         >
-          New Ticket
-        </Button>
-      </Box>
+          <TextField
+            name="search"
+            label="Search"
+            variant="outlined"
+            size="small"
+            onChange={handleTextFieldChange}
+            sx={{ flexGrow: 1 }}
+          />
 
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <TextField
-          name="search"
-          label="Search"
-          variant="outlined"
-          size="small"
-          onChange={handleTextFieldChange}
-          sx={{ flexGrow: 1 }}
-        />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              name="status"
+              label="Status"
+              value={params.status || ''}
+              onChange={handleSelectChange}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value={TicketStatus.OPEN}>Open</MenuItem>
+              <MenuItem value={TicketStatus.IN_PROGRESS}>In Progress</MenuItem>
+              <MenuItem value={TicketStatus.PENDING}>Pending</MenuItem>
+              <MenuItem value={TicketStatus.RESOLVED}>Resolved</MenuItem>
+              <MenuItem value={TicketStatus.CLOSED}>Closed</MenuItem>
+            </Select>
+          </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Status</InputLabel>
-          <Select
-            name="status"
-            label="Status"
-            value={params.status || ''}
-            onChange={handleSelectChange}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value={TicketStatus.OPEN}>Open</MenuItem>
-            <MenuItem value={TicketStatus.IN_PROGRESS}>In Progress</MenuItem>
-            <MenuItem value={TicketStatus.PENDING}>Pending</MenuItem>
-            <MenuItem value={TicketStatus.RESOLVED}>Resolved</MenuItem>
-            <MenuItem value={TicketStatus.CLOSED}>Closed</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Priority</InputLabel>
-          <Select
-            name="priority"
-            label="Priority"
-            value={params.priority || ''}
-            onChange={handleSelectChange}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value={TicketPriority.LOW}>Low</MenuItem>
-            <MenuItem value={TicketPriority.MEDIUM}>Medium</MenuItem>
-            <MenuItem value={TicketPriority.HIGH}>High</MenuItem>
-            <MenuItem value={TicketPriority.URGENT}>Urgent</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Priority</InputLabel>
+            <Select
+              name="priority"
+              label="Priority"
+              value={params.priority || ''}
+              onChange={handleSelectChange}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value={TicketPriority.LOW}>Low</MenuItem>
+              <MenuItem value={TicketPriority.MEDIUM}>Medium</MenuItem>
+              <MenuItem value={TicketPriority.HIGH}>High</MenuItem>
+              <MenuItem value={TicketPriority.URGENT}>Urgent</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      )}
 
       <TableContainer component={Paper}>
         <Table>

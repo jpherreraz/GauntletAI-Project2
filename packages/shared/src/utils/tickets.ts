@@ -37,8 +37,8 @@ export const ticketsApi = {
 
     if (status) query = query.eq('status', status);
     if (priority) query = query.eq('priority', priority);
-    if (assigneeId) query = query.eq('assignee_id', assigneeId);
-    if (customerId) query = query.eq('customer_id', customerId);
+    if (assigneeId) query = query.eq('assigneeId', assigneeId);
+    if (customerId) query = query.eq('customerId', customerId);
     if (search) {
       query = query.or(
         `title.ilike.%${search}%,description.ilike.%${search}%`
@@ -115,9 +115,9 @@ export const ticketsApi = {
       const { data: comments, count, error } = await supabase
         .from('ticket_comments')
         .select('*', { count: 'exact' })
-        .eq('ticket_id', ticketId)
+        .eq('ticketId', ticketId)
         .range((page - 1) * perPage, page * perPage - 1)
-        .order('created_at', { ascending: false });
+        .order('createdAt', { ascending: false });
 
       if (error) throw error;
 
@@ -167,12 +167,12 @@ export const ticketsApi = {
       const { data: attachment, error: attachmentError } = await supabase
         .from('ticket_attachments')
         .insert({
-          ticket_id: ticketId,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          file_url: publicUrl,
-          uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+          ticketId,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          fileUrl: publicUrl,
+          uploadedBy: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
         .single();
@@ -186,14 +186,14 @@ export const ticketsApi = {
     delete: async (id: string): Promise<void> => {
       const { data: attachment, error: fetchError } = await supabase
         .from('ticket_attachments')
-        .select('file_url')
+        .select('fileUrl')
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
 
       // Extract file path from URL
-      const filePath = attachment.file_url.split('/').slice(-2).join('/');
+      const filePath = attachment.fileUrl.split('/').slice(-2).join('/');
       
       // Delete from storage
       const { error: storageError } = await supabase.storage

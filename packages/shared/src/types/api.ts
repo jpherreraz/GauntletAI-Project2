@@ -1,44 +1,38 @@
 import { z } from 'zod';
-import { ticketSchema, ticketCommentSchema } from './ticket';
+import type { Ticket, TicketComment } from './ticket';
 
 // Ticket API types
-export const ticketListParamsSchema = z.object({
-  page: z.number().optional(),
-  perPage: z.number().optional(),
-  status: z.string().optional(),
-  priority: z.string().optional(),
-  assigneeId: z.string().uuid().optional(),
-  customerId: z.string().uuid().optional(),
-  search: z.string().optional(),
-});
+export interface PaginationParams {
+  page?: number;
+  perPage?: number;
+}
 
-export type TicketListParams = z.infer<typeof ticketListParamsSchema>;
+export interface TicketListParams extends PaginationParams {
+  status?: string;
+  priority?: string;
+  customerId?: string;
+  assigneeId?: string | null;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  deleted?: boolean;
+}
 
-export const ticketListResponseSchema = z.object({
-  tickets: z.array(ticketSchema),
-  total: z.number(),
-  page: z.number(),
-  perPage: z.number(),
-});
+export interface TicketListResponse {
+  tickets: Ticket[];
+  total: number;
+  page: number;
+  perPage: number;
+}
 
-export type TicketListResponse = z.infer<typeof ticketListResponseSchema>;
+export interface CommentListParams extends PaginationParams {}
 
-// Comment API types
-export const commentListParamsSchema = z.object({
-  page: z.number().optional(),
-  perPage: z.number().optional(),
-});
-
-export type CommentListParams = z.infer<typeof commentListParamsSchema>;
-
-export const commentListResponseSchema = z.object({
-  comments: z.array(ticketCommentSchema),
-  total: z.number(),
-  page: z.number(),
-  perPage: z.number(),
-});
-
-export type CommentListResponse = z.infer<typeof commentListResponseSchema>;
+export interface CommentListResponse {
+  comments: TicketComment[];
+  total: number;
+  page: number;
+  perPage: number;
+}
 
 // File upload types
 export const fileUploadSchema = z.object({
@@ -58,4 +52,16 @@ export const fileUploadResponseSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
-export type FileUploadResponse = z.infer<typeof fileUploadResponseSchema>; 
+export type FileUploadResponse = z.infer<typeof fileUploadResponseSchema>;
+
+export const ticketCountsResponseSchema = z.object({
+  unassigned: z.number(),
+  unsolved: z.number(),
+  recent: z.number(),
+  pending: z.number(),
+  solved: z.number(),
+  suspended: z.number(),
+  deleted: z.number(),
+});
+
+export type TicketCountsResponse = z.infer<typeof ticketCountsResponseSchema>; 

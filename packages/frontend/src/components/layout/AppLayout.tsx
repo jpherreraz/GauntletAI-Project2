@@ -25,6 +25,7 @@ import {
   Assessment,
   Settings,
   ExitToApp,
+  HelpOutline,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '@crm/shared/constants';
@@ -33,8 +34,16 @@ import { UserRole } from '@crm/shared/types';
 
 const drawerWidth = 240;
 
-const menuItems = [
-  { text: 'Dashboard', icon: <Dashboard />, path: ROUTES.DASHBOARD },
+interface MenuItem {
+  text: string;
+  icon: React.ReactNode;
+  path: string;
+  roles?: UserRole[];
+}
+
+const menuItems: MenuItem[] = [
+  { text: 'Dashboard', icon: <Dashboard />, path: ROUTES.DASHBOARD, roles: [UserRole.ADMIN, UserRole.WORKER] },
+  { text: 'FAQ', icon: <HelpOutline />, path: ROUTES.FAQ, roles: [UserRole.CUSTOMER] },
   { text: 'Tickets', icon: <ConfirmationNumber />, path: ROUTES.TICKETS },
   { text: 'Users', icon: <People />, path: ROUTES.USERS, roles: [UserRole.ADMIN] },
   { text: 'Reports', icon: <Assessment />, path: ROUTES.REPORTS, roles: [UserRole.ADMIN, UserRole.WORKER] },
@@ -85,7 +94,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             (item) =>
               !item.roles || // Show if no roles specified
               (user?.user_metadata?.role &&
-                item.roles.includes(user.user_metadata.role))
+                item.roles.includes(user.user_metadata.role as UserRole))
           )
           .map((item) => (
             <ListItem

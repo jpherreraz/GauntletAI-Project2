@@ -7,7 +7,12 @@ import type {
   TicketComment,
   TicketCommentCreate,
 } from '@crm/shared/types/ticket';
-import type { TicketListParams, FileUpload } from '@crm/shared/types/api';
+import type {
+  TicketListParams,
+  FileUpload,
+  TicketCountsResponse,
+} from '@crm/shared/types/api';
+import { supabase } from '@crm/shared/utils/api-client';
 
 // Query keys
 export const ticketKeys = {
@@ -40,6 +45,21 @@ export const useTicketComments = (ticketId: string) => {
     queryKey: ticketKeys.comments(ticketId),
     queryFn: () => ticketsApi.comments.list(ticketId),
     enabled: !!ticketId,
+  });
+};
+
+export const useTicketCounts = () => {
+  return useQuery({
+    queryKey: ['ticketCounts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ticket_counts_view')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return data as TicketCountsResponse;
+    },
   });
 };
 
