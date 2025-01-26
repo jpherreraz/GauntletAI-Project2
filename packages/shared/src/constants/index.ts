@@ -26,20 +26,7 @@ export const API_ROUTES = {
   },
 } as const;
 
-export const ROUTES = {
-  HOME: '/',
-  LOGIN: '/login',
-  REGISTER: '/register',
-  DASHBOARD: '/dashboard',
-  FAQ: '/faq',
-  TICKETS: '/tickets',
-  TICKET_DETAILS: (id: string) => `/tickets/${id}`,
-  USERS: '/users',
-  USER_DETAILS: (id: string) => `/users/${id}`,
-  PROFILE: '/profile',
-  SETTINGS: '/settings',
-  REPORTS: '/reports',
-} as const;
+export * from './routes';
 
 export const DATE_FORMAT = {
   DISPLAY: 'MMM dd, yyyy',

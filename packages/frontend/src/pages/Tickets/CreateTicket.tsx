@@ -6,32 +6,31 @@ import {
   Typography,
   TextField,
   Button,
+  Grid,
+  Alert,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Grid,
-  Alert,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { useCreateTicket } from '../../hooks/useTickets';
 import { ROUTES } from '@crm/shared/constants';
-import { TicketPriority, TicketStatus } from '@crm/shared/types/ticket';
+import { TicketStatus } from '@crm/shared/types/ticket';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '@crm/shared/utils/api-client';
 
 interface FormValues {
   title: string;
   description: string;
-  priority: typeof TicketPriority[keyof typeof TicketPriority];
+  priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
 }
 
 const validationSchema = yup.object({
   title: yup.string().required('Title is required'),
   description: yup.string().required('Description is required'),
-  priority: yup.string().oneOf(Object.values(TicketPriority)).required('Priority is required'),
+  priority: yup.string().oneOf(['low', 'medium', 'high', 'urgent']).required('Priority is required'),
   category: yup.string().required('Category is required'),
 });
 
@@ -45,7 +44,7 @@ const CreateTicket: React.FC = () => {
     initialValues: {
       title: '',
       description: '',
-      priority: TicketPriority.LOW,
+      priority: 'medium',
       category: '',
     },
     validationSchema,
@@ -56,63 +55,19 @@ const CreateTicket: React.FC = () => {
           return;
         }
 
-        // Log user ID
-        console.log('Current user ID:', user.id);
-        
-        // Check if profile exists
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
-
-        console.log('Profile check result:', { profile, profileError });
-
-        if (!profile) {
-          console.log('Creating profile for user...');
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert([{ 
-              id: user.id, 
-              firstName: '', 
-              lastName: '', 
-              role: 'customer' 
-            }])
-            .select()
-            .single();
-          
-          console.log('Profile creation result:', { newProfile, createError });
-          
-          if (createError) {
-            console.error('Profile creation error:', createError);
-            setError('Failed to create user profile');
-            return;
-          }
-        }
-        
         const ticketData = {
-          ...values,
-          status: TicketStatus.OPEN,
-          customerId: user.id,
-          dueDate: null,
-          tags: [],
+          title: values.title,
+          description: values.description,
+          priority: values.priority,
+          category: values.category,
+          customer_id: user.id,
         };
         
-        console.log('Creating ticket with data:', ticketData);
-        const result = await createTicket.mutateAsync(ticketData);
-        console.log('Ticket created:', result);
-
+        await createTicket.mutateAsync(ticketData);
         navigate(ROUTES.TICKETS);
       } catch (err) {
         console.error('Failed to create ticket:', err);
-        if (err instanceof Error) {
-          setError(err.message);
-        } else if (typeof err === 'object' && err !== null) {
-          console.error('Detailed error:', JSON.stringify(err, null, 2));
-          setError('Failed to create ticket. Check console for details.');
-        } else {
-          setError('Failed to create ticket');
-        }
+        setError('Failed to create ticket. Please try again.');
       }
     },
   });
@@ -163,7 +118,7 @@ const CreateTicket: React.FC = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <FormControl fullWidth>
                 <InputLabel id="priority-label">Priority</InputLabel>
                 <Select
@@ -176,15 +131,15 @@ const CreateTicket: React.FC = () => {
                   onBlur={formik.handleBlur}
                   error={formik.touched.priority && Boolean(formik.errors.priority)}
                 >
-                  <MenuItem value={TicketPriority.LOW}>Low</MenuItem>
-                  <MenuItem value={TicketPriority.MEDIUM}>Medium</MenuItem>
-                  <MenuItem value={TicketPriority.HIGH}>High</MenuItem>
-                  <MenuItem value={TicketPriority.URGENT}>Urgent</MenuItem>
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="urgent">Urgent</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 id="category"

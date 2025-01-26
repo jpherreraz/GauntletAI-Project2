@@ -16,88 +16,92 @@ import type {
 } from '../types/api';
 import { PAGINATION } from '../constants';
 
+const EDGE_FUNCTION_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
+
+// Helper to get auth token
+async function getAuthToken(): Promise<string> {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) throw new Error('Not authenticated');
+  return session.access_token;
+}
+
+// Helper to make authenticated requests to edge functions
+async function fetchApi(path: string, options: RequestInit = {}) {
+  const token = await getAuthToken();
+  const response = await fetch(`${EDGE_FUNCTION_URL}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw error;
+  }
+
+  return response.json();
+}
+
 // Ticket operations
 export const ticketsApi = {
   // List tickets with filtering and pagination
   list: async (params: TicketListParams = {}): Promise<TicketListResponse> => {
-    const {
-      page = PAGINATION.DEFAULT_PAGE,
-      perPage = PAGINATION.DEFAULT_PER_PAGE,
-      status,
-      priority,
-      assigneeId,
-      customerId,
-      search,
-    } = params;
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set('page', params.page.toString());
+    if (params.perPage) searchParams.set('perPage', params.perPage.toString());
+    if (params.status) searchParams.set('status', params.status);
+    if (params.priority) searchParams.set('priority', params.priority);
+    if (params.assigneeId) searchParams.set('assigneeId', params.assigneeId);
+    if (params.customerId) searchParams.set('customerId', params.customerId);
+    if (params.search) searchParams.set('search', params.search);
 
-    let query = supabase
-      .from('tickets')
-      .select('*', { count: 'exact' })
-      .range((page - 1) * perPage, page * perPage - 1);
-
-    if (status) query = query.eq('status', status);
-    if (priority) query = query.eq('priority', priority);
-    if (assigneeId) query = query.eq('assigneeId', assigneeId);
-    if (customerId) query = query.eq('customerId', customerId);
-    if (search) {
-      query = query.or(
-        `title.ilike.%${search}%,description.ilike.%${search}%`
-      );
-    }
-
-    const { data: tickets, count, error } = await query;
-
-    if (error) throw error;
-
+    const { tickets } = await fetchApi('/tickets?' + searchParams.toString());
     return {
-      tickets: tickets as Ticket[],
-      total: count || 0,
-      page,
-      perPage,
+      tickets,
+      total: tickets.length, // TODO: implement proper pagination in edge function
+      page: params.page || PAGINATION.DEFAULT_PAGE,
+      perPage: params.perPage || PAGINATION.DEFAULT_PER_PAGE,
     };
   },
 
   // Get a single ticket by ID
   get: async (id: string): Promise<Ticket> => {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data as Ticket;
+    const { ticket } = await fetchApi(`/tickets/${id}`);
+    return ticket;
   },
 
   // Create a new ticket
   create: async (ticket: TicketCreate): Promise<Ticket> => {
-    const { data, error } = await supabase
-      .from('tickets')
-      .insert(ticket)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Ticket;
+    const { ticket: createdTicket } = await fetchApi('/tickets', {
+      method: 'POST',
+      body: JSON.stringify(ticket),
+    });
+    return createdTicket;
   },
 
   // Update a ticket
   update: async (id: string, ticket: TicketUpdate): Promise<Ticket> => {
-    const { data, error } = await supabase
-      .from('tickets')
-      .update(ticket)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Ticket;
+    const { ticket: updatedTicket } = await fetchApi(`/tickets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        title: ticket.title,
+        description: ticket.description,
+        status: ticket.status,
+        priority: ticket.priority,
+        assigneeId: ticket.assignee_id,
+      }),
+    });
+    return updatedTicket;
   },
 
   // Delete a ticket
   delete: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('tickets').delete().eq('id', id);
-    if (error) throw error;
+    await fetchApi(`/tickets/${id}`, {
+      method: 'DELETE',
+    });
   },
 
   // Comments operations
@@ -107,108 +111,49 @@ export const ticketsApi = {
       ticketId: string,
       params: CommentListParams = {}
     ): Promise<CommentListResponse> => {
-      const {
-        page = PAGINATION.DEFAULT_PAGE,
-        perPage = PAGINATION.DEFAULT_PER_PAGE,
-      } = params;
+      const searchParams = new URLSearchParams();
+      if (params.page) searchParams.set('page', params.page.toString());
+      if (params.perPage) searchParams.set('perPage', params.perPage.toString());
 
-      const { data: comments, count, error } = await supabase
-        .from('ticket_comments')
-        .select('*', { count: 'exact' })
-        .eq('ticketId', ticketId)
-        .range((page - 1) * perPage, page * perPage - 1)
-        .order('createdAt', { ascending: false });
-
-      if (error) throw error;
-
+      const { comments } = await fetchApi(`/tickets/${ticketId}/comments?` + searchParams.toString());
       return {
-        comments: comments as TicketComment[],
-        total: count || 0,
-        page,
-        perPage,
+        comments,
+        total: comments.length, // TODO: implement proper pagination in edge function
+        page: params.page || PAGINATION.DEFAULT_PAGE,
+        perPage: params.perPage || PAGINATION.DEFAULT_PER_PAGE,
       };
     },
 
     // Create a comment
     create: async (comment: TicketCommentCreate): Promise<TicketComment> => {
-      const { data, error } = await supabase
-        .from('ticket_comments')
-        .insert(comment)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as TicketComment;
+      const { comment: createdComment } = await fetchApi(`/tickets/${comment.ticket_id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content: comment.content }),
+      });
+      return createdComment;
     },
   },
 
   // File operations
   files: {
     // Upload a file
-    upload: async ({
-      file,
-      ticketId,
-    }: FileUpload): Promise<FileUploadResponse> => {
-      const fileName = `${ticketId}/${Date.now()}-${file.name}`;
-      
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('ticket-attachments')
-        .upload(fileName, file);
+    upload: async ({ file, ticketId }: FileUpload): Promise<FileUploadResponse> => {
+      const formData = new FormData();
+      formData.append('file', file);
 
-      if (uploadError) throw uploadError;
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('ticket-attachments')
-        .getPublicUrl(fileName);
-
-      // Create attachment record
-      const { data: attachment, error: attachmentError } = await supabase
-        .from('ticket_attachments')
-        .insert({
-          ticketId,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          fileUrl: publicUrl,
-          uploadedBy: (await supabase.auth.getUser()).data.user?.id,
-        })
-        .select()
-        .single();
-
-      if (attachmentError) throw attachmentError;
-
-      return attachment as FileUploadResponse;
+      const { attachment } = await fetchApi(`/tickets/${ticketId}/attachments`, {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type with boundary
+      });
+      return attachment;
     },
 
     // Delete a file
     delete: async (id: string): Promise<void> => {
-      const { data: attachment, error: fetchError } = await supabase
-        .from('ticket_attachments')
-        .select('fileUrl')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Extract file path from URL
-      const filePath = attachment.fileUrl.split('/').slice(-2).join('/');
-      
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('ticket-attachments')
-        .remove([filePath]);
-
-      if (storageError) throw storageError;
-
-      // Delete record
-      const { error: deleteError } = await supabase
-        .from('ticket_attachments')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) throw deleteError;
+      await fetchApi(`/tickets/attachments/${id}`, {
+        method: 'DELETE',
+      });
     },
   },
 }; 

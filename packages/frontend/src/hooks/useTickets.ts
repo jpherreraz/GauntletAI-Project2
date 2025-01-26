@@ -1,18 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketsApi } from '@crm/shared/utils/tickets';
-import type {
+import { supabase } from '@crm/shared/utils/api-client';
+import {
   Ticket,
   TicketCreate,
   TicketUpdate,
   TicketComment,
   TicketCommentCreate,
+  TicketStatus,
 } from '@crm/shared/types/ticket';
 import type {
   TicketListParams,
   FileUpload,
   TicketCountsResponse,
 } from '@crm/shared/types/api';
-import { supabase } from '@crm/shared/utils/api-client';
+import { User, UserRole } from '@crm/shared/types/user';
+
+const TICKETS_QUERY_KEY = 'tickets';
+const TICKET_COMMENTS_QUERY_KEY = 'ticket-comments';
 
 // Query keys
 export const ticketKeys = {
@@ -24,27 +29,76 @@ export const ticketKeys = {
   comments: (ticketId: string) => [...ticketKeys.detail(ticketId), 'comments'] as const,
 };
 
-// Hooks
-export const useTickets = (params: TicketListParams = {}) => {
-  return useQuery({
-    queryKey: ticketKeys.list(params),
-    queryFn: () => ticketsApi.list(params),
+interface UseTicketsOptions {
+  customerId?: string;
+  assigneeId?: string;
+}
+
+interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  user_metadata: {
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+}
+
+interface SupabaseUser {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+  user_metadata: {
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+}
+
+interface SupabaseTicket {
+  id: string;
+  title: string;
+  description: string;
+  status: TicketStatus;
+  customer_id: string;
+  assignee_id: string | null;
+  created_at: string;
+  updated_at: string;
+  customer: SupabaseUser;
+  assignee: SupabaseUser | null;
+}
+
+export const useTickets = (options?: UseTicketsOptions) => {
+  return useQuery<Ticket[]>({
+    queryKey: ticketKeys.list({ customerId: options?.customerId, assigneeId: options?.assigneeId }),
+    queryFn: async () => {
+      const params: TicketListParams = {
+        ...(options?.customerId && { customerId: options.customerId }),
+        ...(options?.assigneeId && { assigneeId: options.assigneeId }),
+      };
+      const response = await ticketsApi.list(params);
+      return response.tickets;
+    },
   });
 };
 
 export const useTicket = (id: string) => {
-  return useQuery({
+  return useQuery<Ticket>({
     queryKey: ticketKeys.detail(id),
     queryFn: () => ticketsApi.get(id),
-    enabled: !!id,
   });
 };
 
 export const useTicketComments = (ticketId: string) => {
-  return useQuery({
-    queryKey: ticketKeys.comments(ticketId),
-    queryFn: () => ticketsApi.comments.list(ticketId),
-    enabled: !!ticketId,
+  return useQuery<TicketComment[]>({
+    queryKey: [TICKET_COMMENTS_QUERY_KEY, ticketId],
+    queryFn: async () => {
+      const response = await ticketsApi.comments.list(ticketId);
+      return response.comments;
+    },
   });
 };
 
@@ -79,11 +133,12 @@ export const useUpdateTicket = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ticket }: { id: string; ticket: TicketUpdate }) =>
-      ticketsApi.update(id, ticket),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+    mutationFn: async (params: { id: string } & TicketUpdate) => {
+      const { id, ...update } = params;
+      return ticketsApi.update(id, update);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TICKETS_QUERY_KEY] });
     },
   });
 };
@@ -103,9 +158,24 @@ export const useCreateComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (comment: TicketCommentCreate) => ticketsApi.comments.create(comment),
-    onSuccess: (_, { ticketId }) => {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.comments(ticketId) });
+    mutationFn: async (comment: TicketCommentCreate) => {
+      const { data, error } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: comment.ticket_id,
+          user_id: comment.user_id,
+          content: comment.content,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [TICKET_COMMENTS_QUERY_KEY, variables.ticket_id],
+      });
     },
   });
 };

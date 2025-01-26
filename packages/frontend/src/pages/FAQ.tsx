@@ -18,24 +18,24 @@ import { ROUTES } from '@crm/shared/constants';
 
 const faqs = [
   {
-    question: "How do I track my order?",
-    answer: "You can track your order by logging into your account and visiting the Orders section. There you will find real-time updates on your order status.",
+    question: "How do I submit a support ticket?",
+    answer: "Click the 'Contact Support' button above or navigate to the Tickets page from the sidebar. Then click 'New Ticket', enter a title and description for your issue, and submit the form.",
   },
   {
-    question: "What is your return policy?",
-    answer: "We offer a 30-day return policy for most items. Items must be unused and in their original packaging. Contact our support team to initiate a return.",
+    question: "How long will it take to get a response?",
+    answer: "Our support team typically responds within 24-48 hours. Once your ticket is assigned to a support representative, you'll be able to communicate with them directly through the ticket.",
   },
   {
-    question: "How can I change my account information?",
-    answer: "You can update your account information by going to your Profile settings. There you can modify your personal details, email, and password.",
+    question: "How can I check the status of my ticket?",
+    answer: "Go to the Tickets page in the sidebar to view all your tickets. Each ticket will show its current status: Pending (waiting for assignment), In Progress (being worked on), or Resolved.",
   },
   {
-    question: "What payment methods do you accept?",
-    answer: "We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and bank transfers.",
+    question: "Can I update my ticket after submitting it?",
+    answer: "Yes, you can add additional information by clicking on your ticket and adding a comment to the conversation. This helps our support team better understand and resolve your issue.",
   },
   {
-    question: "How long does shipping take?",
-    answer: "Standard shipping typically takes 3-5 business days. Express shipping options are available at checkout for faster delivery.",
+    question: "What should I do if my issue is urgent?",
+    answer: "Submit a ticket with a clear description of the urgency. While all tickets start as 'Pending', our team prioritizes tickets based on their content and impact.",
   },
 ];
 
@@ -49,7 +49,7 @@ const FAQPage = () => {
           How can we help you?
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-          Find answers to common questions below or contact our support team
+          Find answers to common questions below or create a support ticket
         </Typography>
         <Button
           variant="contained"

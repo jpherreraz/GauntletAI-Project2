@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Paper,
@@ -8,139 +8,92 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
   Chip,
-  IconButton,
-  TextField,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  SelectChangeEvent,
   Button,
   Typography,
   CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  Tooltip,
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Add as AddIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Lock as LockIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useTickets, useDeleteTicket } from '../../hooks/useTickets';
+import { useTickets, useUpdateTicket } from '../../hooks/useTickets';
+import { useWorkers } from '../../hooks/useWorkers';
 import { ROUTES } from '@crm/shared/constants';
-import type { TicketListParams } from '@crm/shared/types/api';
-import { TicketStatus, TicketPriority } from '@crm/shared/types/ticket';
+import { TicketStatus } from '@crm/shared/types/ticket';
 import { useAuth } from '../../contexts/AuthContext';
-import { UserRole } from '@crm/shared/types/user';
+import { UserRole, User } from '@crm/shared/types/user';
+import { useProfile } from '../../hooks/useProfile';
 
 const statusColors = {
-  open: 'info',
-  in_progress: 'warning',
-  pending: 'secondary',
+  pending: 'warning',
+  in_progress: 'info',
   resolved: 'success',
-  closed: 'default',
 } as const;
 
-const priorityColors = {
-  low: 'success',
-  medium: 'info',
-  high: 'warning',
-  urgent: 'error',
-} as const;
-
-interface TicketListProps {
-  filter?: 'unassigned' | 'unsolved' | 'recent' | 'pending' | 'solved' | 'suspended' | 'deleted';
-}
-
-const TicketList: React.FC<TicketListProps> = ({ filter }) => {
+const TicketList: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isCustomer = user?.user_metadata?.role === UserRole.CUSTOMER;
-  const [params, setParams] = useState<TicketListParams>(() => {
-    const initialParams: TicketListParams = {
-      page: 1,
-      perPage: 10,
-    };
+  const updateTicket = useUpdateTicket();
+  const { data: workers } = useWorkers();
+  const { data: userProfileData, isLoading: isLoadingProfile } = useProfile(user?.id);
 
-    if (filter === 'unassigned') {
-      initialParams.assigneeId = null;
-    }
+  // Get the first item from the array since get_user_profile returns a single row
+  const userProfile = userProfileData?.[0];
+  const role = userProfile?.role;
+  const isCustomer = role === 'customer';
+  const isWorker = role === 'worker';
+  const isAdmin = role === 'admin';
 
-    if (filter === 'unsolved') {
-      initialParams.status = 'open';
-      initialParams.sortBy = 'updatedAt';
-      initialParams.sortOrder = 'desc';
-    }
+  console.log('User profile:', userProfileData);
+  console.log('Workers data in TicketList:', workers);
 
-    if (filter === 'recent') {
-      initialParams.sortBy = 'updatedAt';
-      initialParams.sortOrder = 'desc';
-    }
-
-    if (filter === 'pending') {
-      initialParams.status = 'pending';
-    }
-
-    if (filter === 'solved') {
-      initialParams.status = 'resolved';
-    }
-
-    if (filter === 'suspended') {
-      initialParams.status = 'closed';
-    }
-
-    if (filter === 'deleted') {
-      initialParams.deleted = true;
-    }
-
-    return initialParams;
+  const { data: tickets, isLoading: isLoadingTickets } = useTickets({
+    customerId: isCustomer ? user?.id : undefined,
   });
 
-  const { data, isLoading } = useTickets(params);
-  const deleteTicket = useDeleteTicket();
-
-  const handlePageChange = (_: unknown, newPage: number) => {
-    setParams((prev) => ({ ...prev, page: newPage + 1 }));
-  };
-
-  const handleRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setParams((prev) => ({
-      ...prev,
-      page: 1,
-      perPage: parseInt(event.target.value, 10),
-    }));
-  };
-
-  const handleTextFieldChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const { name, value } = event.target;
-    setParams((prev) => ({
-      ...prev,
-      page: 1,
-      [name]: value || undefined,
-    }));
-  };
-
-  const handleSelectChange = (event: SelectChangeEvent<string>) => {
-    const { name, value } = event.target;
-    setParams((prev) => ({
-      ...prev,
-      page: 1,
-      [name]: value || undefined,
-    }));
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this ticket?')) {
-      await deleteTicket.mutateAsync(id);
+  const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    try {
+      await updateTicket.mutateAsync({
+        id: ticketId,
+        status: newStatus,
+      });
+    } catch (error) {
+      console.error('Failed to update ticket status:', error);
     }
   };
 
-  if (isLoading) {
+  const handleAssigneeChange = async (ticketId: string, workerId: string | null) => {
+    try {
+      console.log('Updating assignee:', { ticketId, workerId });
+      await updateTicket.mutateAsync({
+        id: ticketId,
+        assignee_id: workerId,
+      });
+    } catch (error) {
+      console.error('Failed to update ticket assignee:', error);
+    }
+  };
+
+  const canViewTicket = (ticket: any) => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    if (isCustomer) return ticket.customer_id === user.id;
+    if (isWorker) return true;
+    return false;
+  };
+
+  const canOpenTicket = (ticket: any) => {
+    if (!user || !role) return false;
+    if (role === 'admin') return true;
+    if (role === 'customer') return ticket.customer_id === user.id;
+    if (role === 'worker') return ticket.assignee_id === user.id;
+    return false;
+  };
+
+  if (isLoadingProfile || isLoadingTickets) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress />
@@ -170,118 +123,110 @@ const TicketList: React.FC<TicketListProps> = ({ filter }) => {
         )}
       </Box>
 
-      {!isCustomer && (
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 2,
-            mb: 3,
-          }}
-        >
-          <TextField
-            name="search"
-            label="Search"
-            variant="outlined"
-            size="small"
-            onChange={handleTextFieldChange}
-            sx={{ flexGrow: 1 }}
-          />
-
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              name="status"
-              label="Status"
-              value={params.status || ''}
-              onChange={handleSelectChange}
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value={TicketStatus.OPEN}>Open</MenuItem>
-              <MenuItem value={TicketStatus.IN_PROGRESS}>In Progress</MenuItem>
-              <MenuItem value={TicketStatus.PENDING}>Pending</MenuItem>
-              <MenuItem value={TicketStatus.RESOLVED}>Resolved</MenuItem>
-              <MenuItem value={TicketStatus.CLOSED}>Closed</MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Priority</InputLabel>
-            <Select
-              name="priority"
-              label="Priority"
-              value={params.priority || ''}
-              onChange={handleSelectChange}
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value={TicketPriority.LOW}>Low</MenuItem>
-              <MenuItem value={TicketPriority.MEDIUM}>Medium</MenuItem>
-              <MenuItem value={TicketPriority.HIGH}>High</MenuItem>
-              <MenuItem value={TicketPriority.URGENT}>Urgent</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      )}
-
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>Title</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Priority</TableCell>
+              {!isCustomer && <TableCell>Customer</TableCell>}
+              <TableCell>Assignment</TableCell>
               <TableCell>Created</TableCell>
-              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {data?.tickets.map((ticket) => (
-              <TableRow key={ticket.id}>
-                <TableCell>{ticket.title}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={ticket.status}
-                    color={statusColors[ticket.status as keyof typeof statusColors]}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={ticket.priority}
-                    color={
-                      priorityColors[ticket.priority as keyof typeof priorityColors]
+            {tickets?.map((ticket) => {
+              const isAssigned = Boolean(ticket.assignee_id);
+              const isAssignedToCurrentUser = ticket.assignee_id === user?.id;
+              const canOpen = canOpenTicket(ticket);
+
+              return (
+                <TableRow
+                  key={ticket.id}
+                  onClick={() => canOpen && navigate(ROUTES.TICKETS + '/' + ticket.id)}
+                  sx={{
+                    cursor: canOpen ? 'pointer' : 'default',
+                    '&:hover': canOpen ? {
+                      backgroundColor: '#f5f5f5',
+                      '& td': { backgroundColor: '#f5f5f5' }
+                    } : {},
+                    backgroundColor: canOpen ? '#fafafa' : 'inherit',
+                    transition: 'background-color 0.2s ease',
+                    '& td': {
+                      backgroundColor: canOpen ? '#fafafa' : 'inherit',
+                      transition: 'background-color 0.2s ease'
                     }
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  {new Date(ticket.createdAt).toLocaleDateString()}
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    size="small"
-                    onClick={() => navigate(`${ROUTES.TICKETS}/${ticket.id}`)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleDelete(ticket.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
+                  }}
+                >
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {isWorker && !isAssignedToCurrentUser && <LockIcon fontSize="small" color="action" />}
+                      {ticket.title}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    {(isAdmin || (isWorker && isAssignedToCurrentUser)) ? (
+                      <FormControl size="small">
+                        <Select
+                          value={ticket.status}
+                          onChange={(e) => handleStatusChange(ticket.id, e.target.value as TicketStatus)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MenuItem value={TicketStatus.PENDING}>Pending</MenuItem>
+                          <MenuItem value={TicketStatus.IN_PROGRESS}>In Progress</MenuItem>
+                          <MenuItem value={TicketStatus.RESOLVED}>Resolved</MenuItem>
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      <Chip
+                        label={ticket.status}
+                        color={statusColors[ticket.status as keyof typeof statusColors]}
+                        size="small"
+                      />
+                    )}
+                  </TableCell>
+                  {!isCustomer && (
+                    <TableCell>
+                      {ticket.customer?.first_name} {ticket.customer?.last_name}
+                    </TableCell>
+                  )}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {isAdmin ? (
+                      <FormControl size="small" fullWidth>
+                        <Select
+                          value={ticket.assignee_id || ''}
+                          onChange={(e) => handleAssigneeChange(ticket.id, e.target.value || null)}
+                        >
+                          <MenuItem value="">Unassigned</MenuItem>
+                          {workers?.map((worker) => (
+                            <MenuItem key={worker.id} value={worker.id}>
+                              {worker.first_name} {worker.last_name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      isAssigned ? (
+                        <Tooltip title={isAssignedToCurrentUser ? "Assigned to you" : `Assigned to ${ticket.assignee?.first_name} ${ticket.assignee?.last_name}`}>
+                          <Chip 
+                            label={isAssignedToCurrentUser ? "Assigned to you" : "Assigned"} 
+                            color={isAssignedToCurrentUser ? "primary" : "default"} 
+                            size="small" 
+                          />
+                        </Tooltip>
+                      ) : (
+                        <Chip label="Unassigned" color="default" size="small" />
+                      )
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(ticket.created_at).toLocaleDateString()}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
-        <TablePagination
-          component="div"
-          count={data?.total || 0}
-          page={(params.page || 1) - 1}
-          rowsPerPage={params.perPage || 10}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-        />
       </TableContainer>
     </Box>
   );

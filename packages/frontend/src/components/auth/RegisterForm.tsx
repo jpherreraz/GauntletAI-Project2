@@ -33,10 +33,6 @@ const validationSchema = yup.object({
     .required('Confirm password is required'),
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
-  role: yup
-    .string()
-    .oneOf([UserRole.CUSTOMER, UserRole.WORKER])
-    .required('Role is required'),
 });
 
 export const RegisterForm: React.FC = () => {
@@ -50,7 +46,6 @@ export const RegisterForm: React.FC = () => {
       confirmPassword: '',
       firstName: '',
       lastName: '',
-      role: UserRole.CUSTOMER,
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -62,7 +57,7 @@ export const RegisterForm: React.FC = () => {
             data: {
               firstName: values.firstName,
               lastName: values.lastName,
-              role: values.role,
+              role: UserRole.CUSTOMER,
             },
           },
         });
@@ -166,23 +161,6 @@ export const RegisterForm: React.FC = () => {
           formik.touched.confirmPassword && formik.errors.confirmPassword
         }
       />
-
-      <FormControl fullWidth>
-        <InputLabel id="role-label">Role</InputLabel>
-        <Select
-          labelId="role-label"
-          id="role"
-          name="role"
-          value={formik.values.role}
-          label="Role"
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          error={formik.touched.role && Boolean(formik.errors.role)}
-        >
-          <MenuItem value={UserRole.CUSTOMER}>Customer</MenuItem>
-          <MenuItem value={UserRole.WORKER}>Worker</MenuItem>
-        </Select>
-      </FormControl>
 
       <Button
         color="primary"

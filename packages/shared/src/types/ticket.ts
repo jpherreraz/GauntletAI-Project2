@@ -1,70 +1,41 @@
 import { z } from 'zod';
-
-export const TicketPriority = {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high',
-  URGENT: 'urgent',
-} as const;
-
-export type TicketPriority = typeof TicketPriority[keyof typeof TicketPriority];
+import { userSchema } from './user';
 
 export const TicketStatus = {
-  OPEN: 'open',
-  IN_PROGRESS: 'in_progress',
   PENDING: 'pending',
+  IN_PROGRESS: 'in_progress',
   RESOLVED: 'resolved',
-  CLOSED: 'closed',
 } as const;
 
 export type TicketStatus = typeof TicketStatus[keyof typeof TicketStatus];
-
-export const ticketAttachmentSchema = z.object({
-  id: z.string().uuid(),
-  fileName: z.string(),
-  fileType: z.string(),
-  fileSize: z.number(),
-  fileUrl: z.string().url(),
-  uploadedBy: z.string().uuid(),
-  createdAt: z.string().datetime(),
-});
-
-export type TicketAttachment = z.infer<typeof ticketAttachmentSchema>;
 
 export const ticketSchema = z.object({
   id: z.string().uuid(),
   title: z.string().min(1),
   description: z.string(),
   status: z.enum([
-    TicketStatus.OPEN,
-    TicketStatus.IN_PROGRESS,
     TicketStatus.PENDING,
+    TicketStatus.IN_PROGRESS,
     TicketStatus.RESOLVED,
-    TicketStatus.CLOSED,
   ]),
-  priority: z.enum([
-    TicketPriority.LOW,
-    TicketPriority.MEDIUM,
-    TicketPriority.HIGH,
-    TicketPriority.URGENT,
-  ]),
-  customerId: z.string().uuid(),
-  assigneeId: z.string().uuid().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  dueDate: z.string().datetime().nullable(),
-  tags: z.array(z.string()),
-  category: z.string(),
-  attachments: z.array(ticketAttachmentSchema).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
+  customer_id: z.string().uuid(),
+  customer: userSchema.optional(),
+  assignee_id: z.string().uuid().nullable(),
+  assignee: userSchema.optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
 });
 
 export type Ticket = z.infer<typeof ticketSchema>;
 
 export const ticketUpdateSchema = ticketSchema.partial().omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
-  customerId: true,
+  created_at: true,
+  updated_at: true,
+  customer_id: true,
+  customer: true,
+  assignee: true,
 });
 
 export type TicketUpdate = z.infer<typeof ticketUpdateSchema>;
@@ -72,33 +43,34 @@ export type TicketUpdate = z.infer<typeof ticketUpdateSchema>;
 export const ticketCreateSchema = ticketSchema
   .omit({
     id: true,
-    createdAt: true,
-    updatedAt: true,
-    assigneeId: true,
+    created_at: true,
+    updated_at: true,
+    assignee_id: true,
+    assignee: true,
+    customer: true,
+    status: true,
   })
   .extend({
-    customerId: z.string().uuid(),
-    dueDate: z.string().datetime().nullable(),
+    customer_id: z.string().uuid(),
   });
 
 export type TicketCreate = z.infer<typeof ticketCreateSchema>;
 
 export const ticketCommentSchema = z.object({
   id: z.string().uuid(),
-  ticketId: z.string().uuid(),
-  userId: z.string().uuid(),
+  ticket_id: z.string().uuid(),
+  user_id: z.string().uuid(),
   content: z.string(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  attachments: z.array(z.string().url()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
 });
 
 export type TicketComment = z.infer<typeof ticketCommentSchema>;
 
 export const ticketCommentCreateSchema = ticketCommentSchema.omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  created_at: true,
+  updated_at: true,
 });
 
 export type TicketCommentCreate = z.infer<typeof ticketCommentCreateSchema>; 
