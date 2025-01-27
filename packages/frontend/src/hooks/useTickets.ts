@@ -15,6 +15,8 @@ import type {
   TicketCountsResponse,
 } from '@crm/shared/types/api';
 import { User, UserRole } from '@crm/shared/types/user';
+import React from 'react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 const TICKETS_QUERY_KEY = 'tickets';
 const TICKET_COMMENTS_QUERY_KEY = 'ticket-comments';
@@ -93,12 +95,88 @@ export const useTicket = (id: string) => {
 };
 
 export const useTicketComments = (ticketId: string) => {
-  return useQuery<TicketComment[]>({
-    queryKey: [TICKET_COMMENTS_QUERY_KEY, ticketId],
+  const queryClient = useQueryClient();
+
+  // Set up real-time subscription
+  React.useEffect(() => {
+    if (!ticketId) return;
+
+    console.log('Setting up real-time subscription for comments on ticket:', ticketId);
+    
+    type RealtimePayload = {
+      new: Record<string, any>;
+      old: Record<string, any>;
+      eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+      schema: string;
+      table: string;
+      commit_timestamp: string;
+      errors?: any[];
+    };
+
+    const channel = supabase.channel('any')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ticket_comments',
+          filter: `ticket_id=eq.${ticketId}`
+        },
+        (payload: RealtimePayload) => {
+          console.log('Received database change:', payload);
+          console.log('Current ticket ID:', ticketId);
+          console.log('Payload new:', payload.new);
+          
+          if (payload.errors) {
+            console.error('Subscription errors:', payload.errors);
+            return;
+          }
+
+          // Always invalidate on INSERT since we're already filtering by ticket_id
+          console.log('Invalidating comments query');
+          queryClient.invalidateQueries({
+            queryKey: ticketKeys.comments(ticketId),
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to comments');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Channel error:', status);
+        }
+        if (status === 'CLOSED') {
+          console.log('Channel closed');
+        }
+      });
+
+    return () => {
+      console.log('Cleaning up subscription for ticket:', ticketId);
+      supabase.removeChannel(channel);
+    };
+  }, [ticketId, queryClient]);
+
+  return useQuery({
+    queryKey: ticketKeys.comments(ticketId),
     queryFn: async () => {
-      const response = await ticketsApi.comments.list(ticketId);
-      return response.comments;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tickets_comments?ticket_id=${ticketId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch comments');
+      }
+      const { comments } = await response.json();
+      console.log('Raw comments from API:', comments);
+      return comments;
     },
+    enabled: !!ticketId,
   });
 };
 
@@ -159,22 +237,29 @@ export const useCreateComment = () => {
 
   return useMutation({
     mutationFn: async (comment: TicketCommentCreate) => {
-      const { data, error } = await supabase
-        .from('ticket_comments')
-        .insert({
-          ticket_id: comment.ticket_id,
-          user_id: comment.user_id,
-          content: comment.content,
-        })
-        .select()
-        .single();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tickets_comments?ticket_id=${comment.ticket_id}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({ content: comment.content }),
+        }
+      );
 
-      if (error) throw error;
-      return data;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create comment');
+      }
+
+      const { comment: newComment } = await response.json();
+      return newComment;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: [TICKET_COMMENTS_QUERY_KEY, variables.ticket_id],
+        queryKey: ticketKeys.comments(variables.ticket_id),
       });
     },
   });

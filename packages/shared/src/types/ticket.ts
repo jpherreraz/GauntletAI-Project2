@@ -57,12 +57,19 @@ export const ticketCreateSchema = ticketSchema
 export type TicketCreate = z.infer<typeof ticketCreateSchema>;
 
 export const ticketCommentSchema = z.object({
-  id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  id: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  ticket_id: z.string(),
+  user_id: z.string(),
   content: z.string(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+  user: z.object({
+    id: z.string(),
+    role: z.string(),
+    email: z.string(),
+    first_name: z.string(),
+    last_name: z.string()
+  }).optional(),
 });
 
 export type TicketComment = z.infer<typeof ticketCommentSchema>;

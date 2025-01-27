@@ -34,14 +34,114 @@ async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    // Return a default response for now
+    // Get user's role
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to get user role' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const url = new URL(req.url);
+    const ticketId = url.searchParams.get('ticket_id');
+
+    if (!ticketId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing ticket_id parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // First get the ticket to check access
+    const { data: ticket, error: ticketError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (ticketError) {
+      return new Response(
+        JSON.stringify({ error: 'Ticket not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user has access to the ticket
+    if (
+      profile.role === 'customer' && ticket.customer_id !== user.id ||
+      profile.role === 'worker' && !ticket.assignee_id && ticket.assignee_id !== user.id
+    ) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Handle different operations
+    switch (req.method) {
+      // GET - List comments
+      case 'GET': {
+        const { data: comments, error } = await supabase
+          .from('ticket_comments')
+          .select(`
+            *,
+            user:profiles!user_id(
+              id, email, first_name, last_name, role
+            )
+          `)
+          .eq('ticket_id', ticketId)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ comments }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // POST - Create comment
+      case 'POST': {
+        const { content } = await req.json();
+        const { data: comment, error } = await supabase
+          .from('ticket_comments')
+          .insert({
+            ticket_id: ticketId,
+            user_id: user.id,
+            content,
+          })
+          .select(`
+            *,
+            user:profiles!user_id(
+              id, email, first_name, last_name, role
+            )
+          `)
+          .single();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ comment }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      default:
+        return new Response(
+          JSON.stringify({ error: 'Method not allowed' }),
+          { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+  } catch (err) {
+    console.error('Error:', err);
     return new Response(
-      JSON.stringify({ message: 'Comments endpoint working' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

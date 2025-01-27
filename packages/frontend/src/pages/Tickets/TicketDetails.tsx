@@ -15,6 +15,7 @@ import { useTicket, useTicketComments, useCreateComment } from '../../hooks/useT
 import { ROUTES } from '@crm/shared/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '@crm/shared/types/user';
+import { TicketComment } from '@crm/shared/types/ticket';
 
 const statusColors = {
   pending: 'warning',
@@ -109,7 +110,7 @@ const TicketDetails: React.FC = () => {
         </Typography>
 
         <Box sx={{ mb: 3, maxHeight: 400, overflowY: 'auto' }}>
-          {comments?.map((comment) => (
+          {(comments as TicketComment[])?.map((comment: TicketComment) => (
             <Box
               key={comment.id}
               sx={{

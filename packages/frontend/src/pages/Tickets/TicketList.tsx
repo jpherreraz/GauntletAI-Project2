@@ -89,7 +89,7 @@ const TicketList: React.FC = () => {
     if (!user || !role) return false;
     if (role === 'admin') return true;
     if (role === 'customer') return ticket.customer_id === user.id;
-    if (role === 'worker') return ticket.assignee_id === user.id;
+    if (role === 'worker') return true;
     return false;
   };
 

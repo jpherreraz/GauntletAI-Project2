@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@crm/shared/utils/api-client';
+import type { User } from '@crm/shared/types/user';
 
 const PROFILE_QUERY_KEY = 'profile';
 

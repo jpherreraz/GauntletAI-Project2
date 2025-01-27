@@ -7,4 +7,4 @@ DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profi
 ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
 
 -- Grant access only to authenticated users (service role will bypass this)
-REVOKE ALL ON public.profiles FROM anon, authenticated;
+REVOKE ALL ON public.profiles FROM anon, authenticated; 
