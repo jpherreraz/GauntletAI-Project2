@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@crm/shared/utils/api-client';
 import { ROUTES } from '@crm/shared/constants';
+import { UserRole } from '@crm/shared/types';
 
 const validationSchema = yup.object({
   email: yup
@@ -28,6 +29,16 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = React.useState<string | null>(null);
 
+  const getDefaultRoute = (role?: string) => {
+    console.log('🔍 LoginForm: Determining route for role:', role);
+    if (role === 'customer') {
+      console.log('✅ LoginForm: User is a customer, redirecting to FAQ');
+      return ROUTES.FAQ;
+    }
+    console.log('✅ LoginForm: User is admin/worker, redirecting to tickets');
+    return ROUTES.TICKETS;
+  };
+
   const formik = useFormik({
     initialValues: {
       email: '',
@@ -36,15 +47,35 @@ export const LoginForm: React.FC = () => {
     validationSchema,
     onSubmit: async (values) => {
       try {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        console.log('🔍 LoginForm: Attempting login...');
+        const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
         });
 
         if (signInError) throw signInError;
 
-        navigate(ROUTES.DASHBOARD);
+        console.log('✅ LoginForm: Login successful, user data:', authData.user);
+        
+        // Get the user's role from the edge function
+        const { data: profile, error: profileError } = await supabase.functions.invoke('get-user-profile', {
+          body: { userId: authData.user.id }
+        });
+
+        if (profileError) {
+          console.error('❌ LoginForm: Error fetching profile:', profileError);
+          throw profileError;
+        }
+
+        console.log('✅ LoginForm: Profile fetched:', profile);
+        const userRole = profile?.role?.toLowerCase();
+        console.log('🔍 LoginForm: User role:', userRole);
+        
+        const targetRoute = getDefaultRoute(userRole);
+        console.log('🔍 LoginForm: Navigating to:', targetRoute);
+        navigate(targetRoute);
       } catch (err) {
+        console.error('❌ LoginForm: Error during login:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       }
     },

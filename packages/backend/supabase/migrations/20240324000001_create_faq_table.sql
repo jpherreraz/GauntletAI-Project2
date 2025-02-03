@@ -7,22 +7,8 @@ create table public.faqs (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Add RLS
-alter table public.faqs enable row level security;
-
--- Policies
--- Everyone can read FAQs
-create policy "Everyone can read FAQs"
-  on public.faqs for select
-  to authenticated
-  using (true);
-
--- Only admins can create/update/delete FAQs
-create policy "Admins can manage FAQs"
-  on public.faqs for all
-  to authenticated
-  using (auth.jwt() ->> 'role' = 'admin')
-  with check (auth.jwt() ->> 'role' = 'admin');
+-- Disable RLS since we're using edge functions with service role
+alter table public.faqs disable row level security;
 
 -- Add updated_at trigger
 create trigger handle_updated_at before update on public.faqs

@@ -42,6 +42,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=@crm/frontend",
     "build": "npm run build --workspaces",
+    "build:amplify": "cd packages/frontend && npm install --legacy-peer-deps && npm run build",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",

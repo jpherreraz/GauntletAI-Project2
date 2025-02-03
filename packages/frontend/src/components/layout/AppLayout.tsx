@@ -18,6 +18,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '@crm/shared/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '@crm/shared/types';
+import { Sidebar } from './Sidebar';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -57,7 +58,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      <AppBar position="fixed">
+      <AppBar 
+        position="fixed" 
+        sx={{ 
+          zIndex: (theme) => theme.zIndex.drawer + 1 
+        }}
+      >
         <Toolbar>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Support Portal
@@ -83,16 +89,21 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Box>
         </Toolbar>
       </AppBar>
+      
+      <Sidebar />
+      
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           p: 3,
           mt: 8,
+          ml: 2,
         }}
       >
         {children}
       </Box>
+      
       <Menu
         anchorEl={anchorEl}
         id="account-menu"

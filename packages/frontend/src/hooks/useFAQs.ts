@@ -8,12 +8,18 @@ export const useFAQs = () => {
   return useQuery<FAQ[]>({
     queryKey: [FAQ_QUERY_KEY],
     queryFn: async () => {
+      console.log('🔍 useFAQs: Fetching FAQs');
       const { data, error } = await supabase
         .from('faqs')
         .select('*')
-        .order('createdAt', { ascending: true });
+        .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ useFAQs: Error fetching FAQs:', error);
+        throw error;
+      }
+
+      console.log('✅ useFAQs: FAQs fetched:', data);
       return data;
     },
   });
@@ -24,13 +30,19 @@ export const useCreateFAQ = () => {
 
   return useMutation({
     mutationFn: async (faq: FAQCreate) => {
+      console.log('🔍 useCreateFAQ: Creating FAQ:', faq);
       const { data, error } = await supabase
         .from('faqs')
         .insert(faq)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ useCreateFAQ: Error creating FAQ:', error);
+        throw error;
+      }
+
+      console.log('✅ useCreateFAQ: FAQ created:', data);
       return data;
     },
     onSuccess: () => {
@@ -44,6 +56,7 @@ export const useUpdateFAQ = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...update }: FAQUpdate & { id: string }) => {
+      console.log('🔍 useUpdateFAQ: Updating FAQ:', { id, update });
       const { data, error } = await supabase
         .from('faqs')
         .update(update)
@@ -51,7 +64,12 @@ export const useUpdateFAQ = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ useUpdateFAQ: Error updating FAQ:', error);
+        throw error;
+      }
+
+      console.log('✅ useUpdateFAQ: FAQ updated:', data);
       return data;
     },
     onSuccess: () => {
@@ -65,8 +83,18 @@ export const useDeleteFAQ = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('faqs').delete().eq('id', id);
-      if (error) throw error;
+      console.log('🔍 useDeleteFAQ: Deleting FAQ:', id);
+      const { error } = await supabase
+        .from('faqs')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ useDeleteFAQ: Error deleting FAQ:', error);
+        throw error;
+      }
+
+      console.log('✅ useDeleteFAQ: FAQ deleted');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FAQ_QUERY_KEY] });

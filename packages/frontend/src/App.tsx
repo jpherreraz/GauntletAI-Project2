@@ -12,18 +12,42 @@ import theme from './theme';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './contexts/AuthContext';
 
-// Lazy load pages
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Tickets = React.lazy(() => import('./pages/Tickets/index'));
-const Users = React.lazy(() => import('./pages/Users'));
-const Reports = React.lazy(() => import('./pages/Reports'));
-const Settings = React.lazy(() => import('./pages/Settings'));
-const Profile = React.lazy(() => import('./pages/Profile'));
-const FAQ = React.lazy(() => import('./pages/FAQ'));
+console.log('🔍 App: Component loading');
+
+// Lazy load pages with error handling
+const lazyLoad = (importFn: () => Promise<any>) => {
+  console.log('🔍 App: Lazy loading component');
+  return React.lazy(() => 
+    importFn().catch(error => {
+      console.error('❌ App: Error lazy loading component:', error);
+      throw error;
+    })
+  );
+};
+
+const Dashboard = lazyLoad(() => import('./pages/Dashboard'));
+const Tickets = lazyLoad(() => import('./pages/Tickets/index'));
+const Users = lazyLoad(() => import('./pages/Users'));
+const Reports = lazyLoad(() => import('./pages/Reports'));
+const Settings = lazyLoad(() => import('./pages/Settings'));
+const Profile = lazyLoad(() => import('./pages/Profile'));
+const FAQ = lazyLoad(() => import('./pages/FAQ/index'));
 
 export const App: React.FC = () => {
+  console.log('🔍 App: Component rendering');
   const { user } = useAuth();
   const isCustomer = user?.user_metadata?.role === UserRole.CUSTOMER;
+
+  console.log('🔍 App: User role:', user?.user_metadata?.role);
+
+  // Helper function to determine the default route based on user role
+  const getDefaultRoute = () => {
+    const role = user?.user_metadata?.role;
+    if (role === UserRole.CUSTOMER) {
+      return ROUTES.FAQ;
+    }
+    return ROUTES.TICKETS; // Default to tickets for ADMIN and WORKER
+  };
 
   return (
     <ErrorBoundary>
@@ -132,7 +156,7 @@ export const App: React.FC = () => {
             path="/"
             element={
               <Navigate 
-                to={isCustomer ? ROUTES.FAQ : ROUTES.DASHBOARD} 
+                to={getDefaultRoute()} 
                 replace 
               />
             }
@@ -143,7 +167,7 @@ export const App: React.FC = () => {
             path="*"
             element={
               <Navigate 
-                to={isCustomer ? ROUTES.FAQ : ROUTES.DASHBOARD} 
+                to={getDefaultRoute()} 
                 replace 
               />
             }
